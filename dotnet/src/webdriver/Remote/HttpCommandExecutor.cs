@@ -44,6 +44,7 @@ public class HttpCommandExecutor : ICommandExecutor
     private const string RequestAcceptHeader = JsonMimeType + ", " + PngMimeType;
     private const string RequestContentTypeHeader = JsonMimeType + "; charset=" + Utf8CharsetType;
     private const string UserAgentHeaderTemplate = "selenium/{0} (.net {1})";
+    private const int MaxLoggedPayloadLength = 4096; // default truncation for verbose bodies
     private readonly Uri remoteServerUri;
     private readonly TimeSpan serverResponseTimeout;
     private bool isDisposed;
@@ -452,7 +453,7 @@ public class HttpCommandExecutor : ICommandExecutor
 #else
                 var requestContent = await request.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
-                requestLogMessageBuilder.AppendFormat("{0}{1}", Environment.NewLine, requestContent);
+                requestLogMessageBuilder.AppendFormat("{0}{1}", Environment.NewLine, TruncateForLog(requestContent));
             }
 
             _logger.Trace(requestLogMessageBuilder.ToString());
@@ -471,12 +472,23 @@ public class HttpCommandExecutor : ICommandExecutor
                 var responseContent = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 #endif
 
-                responseLogMessageBuilder.AppendFormat("{0}{1}", Environment.NewLine, responseContent);
+                responseLogMessageBuilder.AppendFormat("{0}{1}", Environment.NewLine, TruncateForLog(responseContent));
             }
 
             _logger.Trace(responseLogMessageBuilder.ToString());
 
             return response;
+        }
+
+        private static string TruncateForLog(string text)
+        {
+            if (string.IsNullOrEmpty(text) || text.Length <= MaxLoggedPayloadLength)
+            {
+                return text;
+            }
+
+            int omitted = text.Length - MaxLoggedPayloadLength;
+            return text.Substring(0, MaxLoggedPayloadLength) + $"... [truncated {omitted} chars]";
         }
     }
 }
